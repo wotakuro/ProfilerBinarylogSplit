@@ -30,7 +30,8 @@ Profilerウィンドウを表示の上、下記のようにEditor拡張で呼び
     public class BinlogView(){
         [UnityEditor.MenuItem("Tools/ProfilerLogView")]
         public static void ToProfiler(){
-            UnityEngine.Profiler.AddFramesFromFile("profiler.log");  // 「.data」は指定しないでください。Unity側で勝手に付け足すようです
+            // 「.data」は指定しないでください。Unity側で勝手に付け足すようです
+            UnityEngine.Profiler.AddFramesFromFile("profiler.log");  
         }
     }
 
@@ -56,6 +57,6 @@ MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してく�
 ![Alt text](/doc/img/Execute.png)
 
 
-# 5.5からについて
+## 5.5からについて
 5.5からは Profilerクラスの場所が変わるようです。 
-UnityEngine.Profiler -> UnityEngine.Profiling.Profiler へと変わるようです
+UnityEngine.Profiler -> UnityEngine.Profiling.Profiler へと変わるようです。
