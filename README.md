@@ -1,0 +1,2 @@
+# ProfilerBinarylogSplit
+UnityのProfilerのバイナリログに関するアレコレです
