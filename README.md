@@ -1,4 +1,5 @@
-# UnityProfilerで結果を保存する方法について
+# ProfilerBinarylogSplit
+## UnityProfilerで結果を保存する方法について
 
 Unityには、Profilerの結果を端末内にログファイルとして保存するためのAPIがあります。  
 下記のような呼び出しをすることで、端末内にログファイルを保存させることが可能です。
@@ -24,7 +25,7 @@ Androidの端末の場合、USBケーブルにつないだ上で adbコマンド
 ※5.5からは Profilerクラスの場所が変わるようです。  
 UnityEngine.Profiler -> UnityEngine.Profiling.Profiler
 
-# 保存されたログ profiler.log.dataを見る方法について
+## 保存されたログ profiler.log.dataを見る方法について
 Profilerウィンドウを表示の上、下記のようにEditor拡張で呼び出すことでProfilerウィンドウに結果を表示することが可能です。
 
     public class BinlogView(){
@@ -39,11 +40,11 @@ Profilerウィンドウを表示の上、下記のようにEditor拡張で呼び
 UnityのProfilerが300件までしか履歴がないらしく、それ以上の大きなデータを渡すと 最初の方の結果が捨てられてしまいます。  
 400フレームのデータを渡すと、最初の100フレーム分の結果が見れません…。
 
-# このツールについて
+## このツールについて
 このツールは 先の300フレーム問題を一時的に回避するべく開発しました。  
 内部的には Profilerログのバイナリファイルから一部分だけ切り出して、Profiler.AddFramesFromFileをしてやることで、最初の方の結果も見れるようにしようというものです。  
 
-## 利用方法
+### 利用方法
 MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してください。ウィンドウが出てくるはずです。  
 ![Alt text](/doc/img/ProfilerSplit.png)
 
@@ -56,6 +57,9 @@ MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してく�
 このように実行されます  
 ![Alt text](/doc/img/Execute.png)
 
+## Sampleについて
+Assets/Sample以下にログ書き出しのサンプルを用意しました。
+また、サンプル用に事前に書き出したログ「profiler_sample.log.data」を直下に置いています。
 
 ## 5.5からについて
 5.5からは Profilerクラスの場所が変わるようです。 
