@@ -48,6 +48,7 @@ UnityのProfilerが300件までしか履歴がないらしく、それ以上の�
 こうしてやることで、最初の方の結果も見れるようにしようというものです。  
 
 ### 利用方法
+Assets/ProfilerBinlogSplit 以下をプロジェクトにコピーして下さい。  
 MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してください。ウィンドウが出てくるはずです。  
 ![Alt text](/doc/img/ProfilerSplit.png)
 
