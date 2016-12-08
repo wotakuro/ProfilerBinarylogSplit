@@ -63,8 +63,6 @@ MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してく�
 
 ## Sampleについて
 Assets/Sample以下にログ書き出しのサンプルを用意しました。
-また、サンプル用に事前に書き出したログ「profiler_sample.log.data」を直下に置いています。
 
-## 5.5からについて
-5.5からは Profilerクラスの場所が変わるようです。 
-UnityEngine.Profiler -> UnityEngine.Profiling.Profiler へと変わるようです。
+また、サンプル用に事前に書き出したログ「profiler_sample.log.data」を直下に置いています。
+※5.4にて作成したログなので、5.4でお試しください。
