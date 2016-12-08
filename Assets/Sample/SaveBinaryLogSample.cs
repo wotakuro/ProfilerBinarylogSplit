@@ -1,5 +1,9 @@
 ﻿using UnityEngine;
 using System.IO;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
+
 
 public class SaveBinaryLogSample : MonoBehaviour {
     

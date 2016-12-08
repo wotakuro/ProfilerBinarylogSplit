@@ -3,6 +3,11 @@ using UnityEditor;
 using System.Collections;
 using System.IO;
 
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
+
+
 namespace ProfilerBinlogSplit
 {
     public class BinLogToUnityProfiler : EditorWindow
