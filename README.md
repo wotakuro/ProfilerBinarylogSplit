@@ -19,8 +19,8 @@ profiler.log.data はバイナリ形式のログで、Profilerウィンドウに
 Androidの端末の場合、USBケーブルにつないだ上で adbコマンド等を駆使することで端末からログファイルをPCに転送することが可能です。  
 多くのAndroid端末では、下記コマンドを叩くことでセーブデータ領域にある profilerログをお取り寄せできるのではないかと思います。
 
- adb pull /mnt/sdcard/Android/data/「アプリID(com.hoge.test等)」/profiler.log.data  
- adb pull /Android/data/「アプリID(com.hoge.test等)」/profiler.log.data  
+ adb pull /mnt/sdcard/Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data  
+ adb pull /Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data  
 
 ※5.5からは Profilerクラスの場所が変わるようです。  
 UnityEngine.Profiler -> UnityEngine.Profiling.Profiler
@@ -42,9 +42,13 @@ UnityのProfilerが300件までしか履歴がないらしく、それ以上の�
 
 ## このツールについて
 このツールは 先の300フレーム問題を一時的に回避するべく開発しました。  
-内部的には Profilerログのバイナリファイルから一部分だけ切り出して、Profiler.AddFramesFromFileをしてやることで、最初の方の結果も見れるようにしようというものです。  
+内部的には  
+1)Profilerログのバイナリファイルから一部分だけ切り出したTempファイルを生成します  
+2)Profiler.AddFramesFromFileでTempファイルを指定してプロファイラーに渡していきます  
+こうしてやることで、最初の方の結果も見れるようにしようというものです。  
 
 ### 利用方法
+Assets/ProfilerBinlogSplit 以下をプロジェクトにコピーして下さい。  
 MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してください。ウィンドウが出てくるはずです。  
 ![Alt text](/doc/img/ProfilerSplit.png)
 
