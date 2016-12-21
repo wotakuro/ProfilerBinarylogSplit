@@ -32,7 +32,7 @@ Profilerウィンドウを表示の上、下記のようにEditor拡張で呼び
         [UnityEditor.MenuItem("Tools/ProfilerLogView")]
         public static void ToProfiler(){
             // 「.data」は指定しないでください。Unity側で勝手に付け足すようです
-            UnityEngine.Profiler.AddFramesFromFile("profiler.log");  
+            Profiler.AddFramesFromFile("profiler.log");  
         }
     }
 
