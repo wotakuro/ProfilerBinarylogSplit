@@ -25,6 +25,8 @@ Androidの端末の場合、USBケーブルにつないだ上で adbコマンド
 ※5.5からは Profilerクラスの場所が変わるようです。  
 UnityEngine.Profiler -> UnityEngine.Profiling.Profiler
 
+iOS端末の場合、XCode上の「info.plist」を編集することで、iTunesからデータのアクセスが可能になります。<br />
+UIFileSharingEnabledをYESに設定することで転送可能になります。
 ## 保存されたログ profiler.log.dataを見る方法について
 Profilerウィンドウを表示の上、下記のようにEditor拡張で呼び出すことでProfilerウィンドウに結果を表示することが可能です。
 
