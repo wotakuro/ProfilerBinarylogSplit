@@ -18,8 +18,8 @@ profiler.log.data はバイナリ形式のログで、Profilerウィンドウに
 
 Androidの端末の場合、USBケーブルにつないだ上で adbコマンド等を駆使することで端末からログファイルをPCに転送することが可能です。  
 多くのAndroid端末では、下記コマンドを叩くことでセーブデータ領域にある profilerログをお取り寄せできるのではないかと思います。
-
- adb pull /mnt/sdcard/Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data  
+ adb pull /storage/emulated/0/Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data  
+ adb pull /mnt/sdcard/Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data  
  adb pull /Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data  
 
 ※5.5からは Profilerクラスの場所が変わるようです。  
