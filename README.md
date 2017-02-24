@@ -10,6 +10,9 @@ Unityには、Profilerの結果を端末内にログファイルとして保存�
     Profiler.enableBinaryLog = true;
     // プロファイリング自体を有効に
     Profiler.enabled = true;
+    
+※5.5からは Profilerクラスの場所が変わるようです。  
+UnityEngine.Profiler -> UnityEngine.Profiling.Profiler
 
 コチラの呼び出しで、端末上のセーブデータ領域に「profiler.log」「profiler.log.data」という二種類のファイルが出来ます。  
 profiler.logはテキスト形式のログですが、フレームレートを延々とログしているだけのものです。  
@@ -22,9 +25,6 @@ Androidの端末の場合、USBケーブルにつないだ上で adbコマンド
     adb pull /storage/emulated/0/Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data
     adb pull /mnt/sdcard/Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data  
     adb pull /Android/data/「アプリID(com.hoge.test等)」/files/profiler.log.data  
-
-※5.5からは Profilerクラスの場所が変わるようです。  
-UnityEngine.Profiler -> UnityEngine.Profiling.Profiler
 
 iOS端末の場合、XCode上の「info.plist」を編集することで、iTunesからデータのアクセスが可能になります。<br />
 UIFileSharingEnabledをYESに設定することで転送可能になります。
