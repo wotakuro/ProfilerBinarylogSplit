@@ -13,8 +13,6 @@ Unityには、Profilerの結果を端末内にログファイルとして保存�
     
 ※5.5からは Profilerクラスの場所が変わるようです。  
 UnityEngine.Profiler -> UnityEngine.Profiling.Profiler
-※ 2017.3で上記で保存されるファイルのフォーマットが変更になりました。
-　対応のめどはたっていません
 
 コチラの呼び出しで、端末上のセーブデータ領域に「profiler.log」「profiler.log.data」という二種類のファイルが出来ます。  
 profiler.logはテキスト形式のログですが、フレームレートを延々とログしているだけのものです。  

@@ -9,15 +9,20 @@ namespace ProfilerBinlogSplit
         const uint FileSignature = 'U' << 24 | '3' << 16 | 'D' << 8 | 'P';
         const uint BlockHeaderSignature = 0xB10C7EAD;
         const ulong BlockHeaderGlobalThreadId = 18446744073709551614;
+        const ushort MessageFrame = 34;
 
+        private bool isAlignedMemoryAccess;
         private ulong mainThreadId;
         private uint version;
         private string currentFilePath;
         private long currentFilePos;
+        private long currentFileLength;
         private int currentFrame;
+        private uint currentFrameIdx;
 
-        private MemoryStream globalDataStream;
-        private MemoryStream currentDataStream;
+        private List<byte> globalDataBuffer;
+        private List<byte> nextGlobalDataStream;
+        private List<byte> currentDataBuffer;
 
         public static bool IsRawData(string path)
         {
@@ -29,15 +34,23 @@ namespace ProfilerBinlogSplit
         public RawDataFileSlicer(string path)
         {
             currentFilePath = path;
-            globalDataStream = new MemoryStream(1024*1024);
-            currentDataStream = new MemoryStream(1024 * 1024);
+            globalDataBuffer = new List<byte>(1024*1024);
+            nextGlobalDataStream = new List<byte>(1024 * 1024);
+            currentDataBuffer = new List<byte>(1024 * 1024);
+            //
+            using (FileStream fs = File.OpenRead(path))
+            {
+                currentFileLength = fs.Length;
+                fs.Close();
+            }
             // read header
             byte[] fileHeader = ReadFromFile(path, 0, 36);
             version = GetUInt(fileHeader, 8);
             mainThreadId = GetULongValue(fileHeader, 28);
+            isAlignedMemoryAccess = (fileHeader[5] != 0);
 
             // append GlobalData
-            globalDataStream.Write(fileHeader, 0, fileHeader.Length);
+            globalDataBuffer.AddRange(fileHeader);
             this.currentFilePos = fileHeader.Length;
         }
 
@@ -52,20 +65,36 @@ namespace ProfilerBinlogSplit
         {
             try
             {
-                for (int i = 0; i < 10; ++i) { this.ReadBlock(); }
-                using (FileStream writeFs = File.Open(tmpFile + ".data", FileMode.Create))
+                while (currentFilePos < currentFileLength)
                 {
-                    writeFs.Write(globalDataStream.ToArray(), 0, (int)globalDataStream.Length);
-                    writeFs.Write(currentDataStream.ToArray(), 0, (int)currentDataStream.Length);
+                    uint frameIdx;
+                    if( GetNextBlockFrame(out frameIdx ))
+                    {
+                        if( currentFrameIdx != frameIdx)
+                        {
+                            this.currentFrame++;
+                            --frameNum;
+                            if(frameNum < 0) { break; }
+                        }
+                        currentFrameIdx = frameIdx;
+                    }
+                    this.ReadBlock();
                 }
-                if (currentDataStream != null) {
-                    currentDataStream.Close();
-                    currentDataStream = new MemoryStream();
+                using (FileStream writeFs = File.Open(tmpFile, FileMode.Create))
+                {
+                    writeFs.Write(globalDataBuffer.ToArray(), 0, globalDataBuffer.Count);
+                    writeFs.Write(currentDataBuffer.ToArray(), 0, currentDataBuffer.Count);
                 }
 
-                UnityEngine.Debug.Log("globalDataStream " + globalDataStream.Length);
-                UnityEngine.Debug.Log("currentDataStream " + currentDataStream.Length);
-                currentFrame += frameNum;
+
+                if(nextGlobalDataStream != null)
+                {
+                    globalDataBuffer.AddRange(nextGlobalDataStream);
+                    nextGlobalDataStream.Clear();
+                }
+                if (currentDataBuffer != null) {
+                    currentDataBuffer.Clear();
+                }
             }catch(System.Exception e)
             {
                 UnityEngine.Debug.LogError(e);
@@ -73,12 +102,35 @@ namespace ProfilerBinlogSplit
             return true;
         }
 
+
+        private bool GetNextBlockFrame(out uint frameIdx )
+        {
+            byte[] data = ReadFromFile(currentFilePath, this.currentFilePos, 20 + 12);
+            ushort type = GetUShort(data, 20);
+            if (type != MessageFrame)
+            {
+                frameIdx = 0;
+                return false;
+            }
+            if (isAlignedMemoryAccess)
+            {
+                frameIdx = GetUInt( data , 24);
+            }
+            else
+            {
+                frameIdx = GetUInt(data, 22);
+            }
+            return true;
+        }
+        
+
         private void ReadBlock()
         {
             byte[] blockHeader = ReadFromFile(currentFilePath, this.currentFilePos , 20);
             ulong threadId = GetULongValue(blockHeader, 8);
             uint length = GetUInt(blockHeader, 16);
             this.currentFilePos += 20;
+            
 
             byte[] blockBodyAndFooter = ReadFromFile(currentFilePath, this.currentFilePos, (int)length + 8);
 
@@ -87,13 +139,19 @@ namespace ProfilerBinlogSplit
 
             if ( threadId == BlockHeaderGlobalThreadId)
             {
-                globalDataStream.Write(blockHeader, 0, blockHeader.Length);
-                globalDataStream.Write(blockBodyAndFooter, 0, blockBodyAndFooter.Length);
+                nextGlobalDataStream.AddRange(blockHeader);
+                nextGlobalDataStream.AddRange(blockBodyAndFooter);
             }
-            currentDataStream.Write(blockHeader, 0, blockHeader.Length);
-            currentDataStream.Write(blockBodyAndFooter, 0, blockBodyAndFooter.Length);
+            currentDataBuffer.AddRange(blockHeader);
+            currentDataBuffer.AddRange(blockBodyAndFooter);
         }
 
+
+        private static ushort GetUShort(byte[] data, int offset)
+        {
+            ushort val = (ushort)( (data[offset + 0] << 0 ) + (data[offset + 1] << 8) );
+            return val;
+        }
 
         private static uint GetUInt(byte[] data,int offset)
         {
