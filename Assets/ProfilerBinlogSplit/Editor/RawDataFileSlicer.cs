@@ -21,8 +21,9 @@ namespace ProfilerBinlogSplit
         private uint currentFrameIdx;
 
         private List<byte> globalDataBuffer;
-        private List<byte> nextGlobalDataStream;
+        private List<byte> nextGlobalDataBuffer;
         private List<byte> currentDataBuffer;
+        private List<byte> nextFrameDataBuffer;
 
         public static bool IsRawData(string path)
         {
@@ -35,8 +36,9 @@ namespace ProfilerBinlogSplit
         {
             currentFilePath = path;
             globalDataBuffer = new List<byte>(1024*1024);
-            nextGlobalDataStream = new List<byte>(1024 * 1024);
+            nextGlobalDataBuffer = new List<byte>(1024 * 1024);
             currentDataBuffer = new List<byte>(1024 * 1024);
+            nextFrameDataBuffer = new List<byte>(1024 * 1024);
             //
             using (FileStream fs = File.OpenRead(path))
             {
@@ -65,20 +67,25 @@ namespace ProfilerBinlogSplit
         {
             try
             {
+                uint finalFrameIdx = uint.MaxValue;
                 while (currentFilePos < currentFileLength)
                 {
                     uint frameIdx;
+                    bool hasBlockFrame = false;
                     if( GetNextBlockFrame(out frameIdx ))
                     {
-                        if( currentFrameIdx != frameIdx)
+                        if ( currentFrameIdx < frameIdx)
                         {
                             this.currentFrame++;
                             --frameNum;
-                            if(frameNum < 0) { break; }
+                            if( frameNum < 0) { finalFrameIdx = frameIdx; }
+                            if(frameNum < -1) { break; }
+                            currentFrameIdx = frameIdx;
                         }
-                        currentFrameIdx = frameIdx;
+                        hasBlockFrame = true;
                     }
-                    this.ReadBlock();
+
+                    this.ReadBlock( (frameIdx > finalFrameIdx) & hasBlockFrame);
                 }
                 using (FileStream writeFs = File.Open(tmpFile, FileMode.Create))
                 {
@@ -87,13 +94,21 @@ namespace ProfilerBinlogSplit
                 }
 
 
-                if(nextGlobalDataStream != null)
+                if(nextGlobalDataBuffer != null)
                 {
-                    globalDataBuffer.AddRange(nextGlobalDataStream);
-                    nextGlobalDataStream.Clear();
+                    globalDataBuffer.AddRange(nextGlobalDataBuffer);
+                    nextGlobalDataBuffer.Clear();
                 }
                 if (currentDataBuffer != null) {
                     currentDataBuffer.Clear();
+                    if( nextFrameDataBuffer != null)
+                    {
+                        currentDataBuffer.AddRange(nextFrameDataBuffer);
+                    }
+                }
+                if(nextFrameDataBuffer != null)
+                {
+                    nextFrameDataBuffer.Clear();
                 }
             }catch(System.Exception e)
             {
@@ -124,8 +139,9 @@ namespace ProfilerBinlogSplit
         }
         
 
-        private void ReadBlock()
+        private void ReadBlock(bool isOverFrameBlock)
         {
+
             byte[] blockHeader = ReadFromFile(currentFilePath, this.currentFilePos , 20);
             ulong threadId = GetULongValue(blockHeader, 8);
             uint length = GetUInt(blockHeader, 16);
@@ -139,11 +155,19 @@ namespace ProfilerBinlogSplit
 
             if ( threadId == BlockHeaderGlobalThreadId)
             {
-                nextGlobalDataStream.AddRange(blockHeader);
-                nextGlobalDataStream.AddRange(blockBodyAndFooter);
+                nextGlobalDataBuffer.AddRange(blockHeader);
+                nextGlobalDataBuffer.AddRange(blockBodyAndFooter);
             }
-            currentDataBuffer.AddRange(blockHeader);
-            currentDataBuffer.AddRange(blockBodyAndFooter);
+            if (isOverFrameBlock)
+            {
+                nextFrameDataBuffer.AddRange(blockHeader);
+                nextFrameDataBuffer.AddRange(blockBodyAndFooter);
+            }
+            else
+            {
+                currentDataBuffer.AddRange(blockHeader);
+                currentDataBuffer.AddRange(blockBodyAndFooter);
+            }
         }
 
 
