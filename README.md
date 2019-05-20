@@ -10,6 +10,11 @@ Unityには、Profilerの結果を端末内にログファイルとして保存�
     Profiler.enableBinaryLog = true;
     // プロファイリング自体を有効に
     Profiler.enabled = true;
+    // 2018.3から重要( CPU 項目以外が空になります )
+    Profiler.SetAreaEnabled(ProfilerArea.Memory, true);
+    Profiler.SetAreaEnabled(ProfilerArea.Rendering, true);
+    Profiler.SetAreaEnabled(ProfilerArea.UI, true);
+
     
 ※5.5からは Profilerクラスの場所が変わるようです。  
 UnityEngine.Profiler -> UnityEngine.Profiling.Profiler
