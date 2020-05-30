@@ -58,7 +58,7 @@ UnityのProfilerが300件までしか履歴がないらしく、それ以上の�
 ### 利用方法
 Assets/ProfilerBinlogSplit 以下をプロジェクトにコピーして下さい。  
 MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してください。ウィンドウが出てくるはずです。  
-![Alt text](/doc/img/ProfilerSplit.png)
+![Alt text](/Documentation~/img/ProfilerSplit.png)
 
 1).バイナリログファイルの指定をしてください  
 2).読み込むフレーム数を指定できます  
@@ -67,7 +67,7 @@ MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してく�
 5).0フレーム目から再スタートさせます  
 
 このように実行されます  
-![Alt text](/doc/img/Execute.png)
+![Alt text](/Documentation~/img/Execute.png)
 
 ## Sampleについて
 Assets/Sample以下にログ書き出しのサンプルを用意しました。

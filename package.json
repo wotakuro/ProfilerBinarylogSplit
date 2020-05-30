@@ -1,0 +1,10 @@
+{
+  "category": "profiler",
+  "description": "Profiler log split",
+  "keywords": [
+    "profiler"
+  ],
+  "name": "com.utj.profilerlogsplit",
+  "unity": "2018.4",
+  "version": "1.0.0"
+}
