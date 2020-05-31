@@ -57,7 +57,7 @@ UnityのProfilerが300件までしか履歴がないらしく、それ以上の�
 
 ### 利用方法
 Assets/ProfilerBinlogSplit 以下をプロジェクトにコピーして下さい。  
-MenuよりTools->ProfilerBinlogSplitで、このツールを呼び出してください。ウィンドウが出てくるはずです。  
+MenuよりTools->UTJ->ProfilerBinlogSplitで、このツールを呼び出してください。ウィンドウが出てくるはずです。  
 ![Alt text](/Documentation~/img/ProfilerSplit.png)
 
 1).バイナリログファイルの指定をしてください  

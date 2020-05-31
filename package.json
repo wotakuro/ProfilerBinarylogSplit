@@ -5,6 +5,7 @@
     "profiler"
   ],
   "name": "com.utj.profilerlogsplit",
+  "displayName": "Profiler Log Split",
   "unity": "2018.4",
   "version": "1.0.0"
 }

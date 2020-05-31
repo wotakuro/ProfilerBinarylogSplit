@@ -25,7 +25,7 @@ namespace ProfilerBinlogSplit
 
         private ILogFileSlicer slicer;
 
-        [MenuItem("Tools/ProfilerBinlogSlice")]
+        [MenuItem("Tools/UTJ/ProfilerBinlogSlice")]
         public static void GetWindow()
         {
             EditorWindow.GetWindow<BinLogToUnityProfiler>();
