@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace ProfilerBinlogSplit
 {
@@ -15,168 +16,255 @@ namespace ProfilerBinlogSplit
         private ulong mainThreadId;
         private uint version;
         private string currentFilePath;
-        private long currentFilePos;
         private long currentFileLength;
-        private int currentFrame;
-        private uint currentFrameIdx;
 
-        private List<byte> globalDataBuffer;
-        private List<byte> nextGlobalDataBuffer;
-        private List<byte> currentDataBuffer;
-        private List<byte> nextFrameDataBuffer;
+        private int frameNum = 0;
+        private uint startFrameIdx = 0;
+        private float progress;
+        private bool isComplete;
+
+
+        // message Info
+        internal struct FrameMessageInfo
+        {
+            public ulong threadId;
+            public uint frameIdx;
+            public int dataPosIndex;
+        }
+        internal struct FileBlockInfoWithThreadId
+        {
+            public FileBlockInfo blockInfo;
+            public ulong threadId;
+        }
+
+
+        private List<FileBlockInfo> globalDatas;
+        private List<FileBlockInfoWithThreadId> threadDatas;
+
+        private List<FrameMessageInfo> frameMessages;
+
 
         public static bool IsRawData(string path)
         {
-            var bin = ReadFromFile(path, 0, 4);
-            uint header = GetUInt(bin, 0);
+            uint header = 0;
+            using (FileStream fs = File.OpenRead(path))
+            {
+                byte[] bin = ReadFromFile(fs, 36);
+                header = GetUInt(bin, 0);
+                fs.Close();
+            }
             return (FileSignature == header);
         }
 
-        public RawDataFileSlicer(string path)
+        public void SetFile(string path)
         {
-            currentFilePath = path;
-            globalDataBuffer = new List<byte>(1024*1024);
-            nextGlobalDataBuffer = new List<byte>(1024 * 1024);
-            currentDataBuffer = new List<byte>(1024 * 1024);
-            nextFrameDataBuffer = new List<byte>(1024 * 1024);
-            //
-            using (FileStream fs = File.OpenRead(path))
-            {
-                currentFileLength = fs.Length;
-                fs.Close();
-            }
-            // read header
-            byte[] fileHeader = ReadFromFile(path, 0, 36);
-            version = GetUInt(fileHeader, 8);
-            mainThreadId = GetULongValue(fileHeader, 28);
-            isAlignedMemoryAccess = (fileHeader[5] != 0);
+            this.currentFilePath = path;
+            this.globalDatas = new List<FileBlockInfo>();
+            this.threadDatas = new List<FileBlockInfoWithThreadId>();
+            this.frameMessages = new List<FrameMessageInfo>();
 
-            // append GlobalData
-            globalDataBuffer.AddRange(fileHeader);
-            this.currentFilePos = fileHeader.Length;
+            this.progress = 0.0f;
+            this.isComplete = false;
+
+            Thread thread = new Thread(this.Prepare);
+            thread.Start();
         }
 
 
-        public int GetCurrentFrame()
+        public bool CreateTmpFile(int frameIdx, int frameNum, string tmpFile)
         {
-            return currentFrame;
-        }
-
-
-        public bool CreateTmpFile(int frameNum, string tmpFile)
-        {
-            try
+            FileTransfer transferObj = new FileTransfer();
+            List<FileBlockInfo> datas = new List<FileBlockInfo>();
+            using (FileStream writeFs = File.OpenWrite(tmpFile))
             {
-                uint finalFrameIdx = uint.MaxValue;
-                while (currentFilePos < currentFileLength)
+                using (FileStream readFs = File.OpenRead(this.currentFilePath))
                 {
-                    uint frameIdx;
-                    bool hasBlockFrame = false;
-                    if( GetNextBlockFrame(out frameIdx ))
+                    var threadDataIdx = GetThreadDataIndexFromFrameIdx(frameIdx);
+                    this.GetHeadGlobalData( datas,this.threadDatas[threadDataIdx].blockInfo.Position);
+
+                    foreach (var data in datas)
                     {
-                        if ( currentFrameIdx < frameIdx)
-                        {
-                            this.currentFrame++;
-                            --frameNum;
-                            if( frameNum < 0) { finalFrameIdx = frameIdx; }
-                            if(frameNum < -1) { break; }
-                            currentFrameIdx = frameIdx;
-                        }
-                        hasBlockFrame = true;
-                    }
-
-                    this.ReadBlock( (frameIdx > finalFrameIdx) & hasBlockFrame);
-                }
-                using (FileStream writeFs = File.Open(tmpFile, FileMode.Create))
-                {
-                    writeFs.Write(globalDataBuffer.ToArray(), 0, globalDataBuffer.Count);
-                    writeFs.Write(currentDataBuffer.ToArray(), 0, currentDataBuffer.Count);
-                }
-
-
-                if(nextGlobalDataBuffer != null)
-                {
-                    globalDataBuffer.AddRange(nextGlobalDataBuffer);
-                    nextGlobalDataBuffer.Clear();
-                }
-                if (currentDataBuffer != null) {
-                    currentDataBuffer.Clear();
-                    if( nextFrameDataBuffer != null)
-                    {
-                        currentDataBuffer.AddRange(nextFrameDataBuffer);
+                        readFs.Position = data.Position;
+                        transferObj.Transfer(readFs, writeFs, data.Size);
                     }
                 }
-                if(nextFrameDataBuffer != null)
-                {
-                    nextFrameDataBuffer.Clear();
-                }
-            }catch(System.Exception e)
-            {
-                UnityEngine.Debug.LogError(e);
             }
+
             return true;
         }
 
 
-        private bool GetNextBlockFrame(out uint frameIdx )
+        private int GetHeadGlobalData(List<FileBlockInfo> datas,long pos)
         {
-            byte[] data = ReadFromFile(currentFilePath, this.currentFilePos, 20 + 12);
-            ushort type = GetUShort(data, 20);
+            int idx = 0;
+            foreach( var data in globalDatas){
+                if( data.Position < pos)
+                {
+                    datas.Add(data);
+                    ++idx;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            return idx;
+        }
+
+
+
+        public bool IsPrepareDone
+        {
+            get
+            {
+                return this.isComplete;
+            }
+        }
+        public float PrepareProgress
+        {
+            get
+            {
+                return this.progress;
+            }
+        }
+        public int FrameNum
+        {
+            get
+            { 
+                return this.frameNum; 
+            }
+        }
+
+         
+        private void Prepare() { 
+            //
+            using (FileStream fs = File.OpenRead(currentFilePath))
+            {
+                // サイズ
+                this.currentFileLength = fs.Length;
+                // file header
+                byte[] fileHeader = ReadFromFile(fs, 36);
+                this.version = GetUInt(fileHeader, 8);
+                this.mainThreadId = GetULongValue(fileHeader, 28);
+                this.isAlignedMemoryAccess = (fileHeader[5] != 0);
+                // add fileheader as global header
+                globalDatas.Add(new FileBlockInfo(0,36));
+
+                // read Blocks
+                this.ReadBlocks(fs);
+                fs.Close();
+            }
+            // フレーム数算出
+            this.frameNum = CalculateFrameNum(out startFrameIdx);
+
+            // 終了
+            this.isComplete = true;
+            this.progress = 1.0f;
+        }
+
+
+        private int GetThreadDataIndexFromFrameIdx (int frameIdx)
+        {
+            uint actualFrame = this.startFrameIdx + (uint)frameIdx;
+            foreach (var message in frameMessages)
+            {
+                if(message.frameIdx == actualFrame)
+                {
+                    return message.dataPosIndex;
+                }
+            }
+            return 0;
+        }
+
+        private int CalculateFrameNum(out uint minFrameIdx)
+        {
+            minFrameIdx = uint.MaxValue;
+            uint maxFrameidx = uint.MinValue;
+            foreach(var message in frameMessages)
+            {
+                if (message.frameIdx < minFrameIdx)
+                {
+                    minFrameIdx = message.frameIdx;
+                }
+                if (message.frameIdx > maxFrameidx)
+                {
+                    maxFrameidx = message.frameIdx;
+                }
+            }
+            return (int)(maxFrameidx - minFrameIdx) + 1;
+        }
+
+        private void ReadBlocks(FileStream fs)
+        {
+            while (true)
+            {
+                if( this.currentFileLength <= fs.Position) { 
+                    break;
+                }
+                this.progress =(float) ( (double)fs.Position / (double) this.currentFileLength );
+
+                long position = fs.Position;
+                byte[] blockHeader = ReadFromFile(fs, 20);
+                byte[] messageInfo = ReadFromFile(fs, 12);
+
+                ulong threadId = GetULongValue(blockHeader, 8);
+                uint length = GetUInt(blockHeader, 16);
+                uint frameIdx;
+                bool isMessage = ReadFrameMessage(messageInfo, out frameIdx);
+
+                if(isMessage)
+                {
+                    var frameMsgInfo = new FrameMessageInfo()
+                    {
+                        threadId = threadId,
+                        frameIdx = frameIdx,
+                        dataPosIndex = this.threadDatas.Count
+                    };
+                    frameMessages.Add(frameMsgInfo);
+                }
+
+                /* header + size + footer */
+                var blockInfo = new FileBlockInfo(position, 20 + length + 8);
+                if (threadId == BlockHeaderGlobalThreadId)
+                {
+                    this.globalDatas.Add(blockInfo);
+                }
+                else
+                {
+                    FileBlockInfoWithThreadId info = new FileBlockInfoWithThreadId()
+                    {
+                        blockInfo = blockInfo,
+                        threadId = threadId
+                    };
+                    this.threadDatas.Add(info);
+                }
+                fs.Position = blockInfo.Position + blockInfo.Size;
+            }
+        }
+        private bool ReadFrameMessage(byte[] data,out uint frameIdx)
+        {
+            ushort type = GetUShort(data, 0);
             if (type != MessageFrame)
             {
                 frameIdx = 0;
                 return false;
             }
-            if (isAlignedMemoryAccess)
+            if (this.isAlignedMemoryAccess)
             {
-                frameIdx = GetUInt( data , 24);
+                frameIdx = GetUInt(data, 4);
             }
             else
             {
-                frameIdx = GetUInt(data, 22);
+                frameIdx = GetUInt(data, 2);
             }
             return true;
         }
-        
-
-        private void ReadBlock(bool isOverFrameBlock)
-        {
-
-            byte[] blockHeader = ReadFromFile(currentFilePath, this.currentFilePos , 20);
-            ulong threadId = GetULongValue(blockHeader, 8);
-            uint length = GetUInt(blockHeader, 16);
-            this.currentFilePos += 20;
-            
-
-            byte[] blockBodyAndFooter = ReadFromFile(currentFilePath, this.currentFilePos, (int)length + 8);
-
-            this.currentFilePos += length;
-            this.currentFilePos += 8;
-
-            if ( threadId == BlockHeaderGlobalThreadId)
-            {
-                nextGlobalDataBuffer.AddRange(blockHeader);
-                nextGlobalDataBuffer.AddRange(blockBodyAndFooter);
-            }
-            if (isOverFrameBlock)
-            {
-                nextFrameDataBuffer.AddRange(blockHeader);
-                nextFrameDataBuffer.AddRange(blockBodyAndFooter);
-            }
-            else
-            {
-                currentDataBuffer.AddRange(blockHeader);
-                currentDataBuffer.AddRange(blockBodyAndFooter);
-            }
-        }
-
 
         private static ushort GetUShort(byte[] data, int offset)
         {
             ushort val = (ushort)( (data[offset + 0] << 0 ) + (data[offset + 1] << 8) );
             return val;
         }
-
         private static uint GetUInt(byte[] data,int offset)
         {
             uint val = ((uint)data[offset+0] << 0) + 
@@ -185,8 +273,7 @@ namespace ProfilerBinlogSplit
                 ((uint)data[offset + 3] << 24);
             return val;
         }
-
-        public static ulong GetULongValue(byte[] bin, int offset)
+        private static ulong GetULongValue(byte[] bin, int offset)
         {
             return (ulong)(bin[offset + 0] << 0) +
                 (ulong)(bin[offset + 1] << 8) +
@@ -197,20 +284,13 @@ namespace ProfilerBinlogSplit
                 (ulong)(bin[offset + 6] << 48) +
                 (ulong)(bin[offset + 7] << 56);
         }
-        private static byte[] ReadFromFile( string file , long offset,int length)
+        private static byte[] ReadFromFile( FileStream fs,int length)
         {
             byte[] data = new byte[length];
-
-            using (FileStream fs = File.OpenRead(file))
-            {
-                fs.Position = offset;
-                int read = fs.Read(data, 0, length);
-                if( read < length) { throw new System.Exception("ReadError " + length + " - " + read); }
-                fs.Close();
-            }
+            int read = fs.Read(data, 0, length);
+            if (read < length) { throw new System.Exception("ReadError " + length + " - " + read); }
 
             return data;
-
         }
 
     }

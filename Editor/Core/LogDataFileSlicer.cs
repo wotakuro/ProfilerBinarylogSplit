@@ -1,63 +1,119 @@
 ﻿
+using Boo.Lang;
 using System.IO;
 using UnityEngine;
+using System.Threading;
 
 namespace ProfilerBinlogSplit
 {
+    internal struct FileBlockInfo
+    {
+        public long Position;
+        public long Size;
+
+        public FileBlockInfo(long pos,long size)
+        {
+            Position = pos;
+            Size = size;
+        }
+    }
+
+
     public class LogDataFileSlicer : ILogFileSlicer
     {
-
-        private long currentFilePos = 0;
-        private int currentFrame = 0;
+        private float progress = 0.0f;
+        private bool isCompleteFlag = false;
         private string filePath;
+        private List<FileBlockInfo> blocks;
 
-        public LogDataFileSlicer(string path)
+        public void SetFile(string path)
         {
             this.filePath = path;
-        }
-        public int GetCurrentFrame()
-        {
-            return currentFrame;
+            this.blocks = new List<FileBlockInfo>();
+            this.isCompleteFlag = false;
+            this.progress = 0.0f;
+
+            Thread thread = new Thread(this.Prepare);
+            thread.Start();
         }
 
-        public bool CreateTmpFile(int frameNum,string TmpFileName)
+        public bool IsPrepareDone
         {
-            bool flag = false;
+            get
+            {
+                return isCompleteFlag;
+            }
+        }
+        public float PrepareProgress
+        {
+            get
+            {
+                return progress;
+            }
+        }
+        public int FrameNum
+        {
+            get
+            {
+                if( this.blocks == null) { return 0; }
+                return this.blocks.Count;
+            }
+        }
+
+        public void Prepare()
+        {
+            long fileSize = 0;
+            long currentFilePos = 0;
             using (FileStream fs = File.OpenRead(this.filePath))
             {
-#if !UNITY_2017_3_OR_NEWER
-                TmpFileName += ".data";
-#endif
-                using (FileStream writeFs = File.Open(TmpFileName, FileMode.Create))
+                fileSize = fs.Length;
+
+                for (int i = 0; ; ++i)
                 {
-                    if (currentFilePos != 0)
-                    {
-                        fs.Seek(currentFilePos, SeekOrigin.Begin);
-                    }
-                    for (int i = 0; i < frameNum; ++i)
-                    {
-                        if (fs.Length <= fs.Position) { break; }
+                    FileBlockInfo info = new FileBlockInfo(currentFilePos, 0);
+                    if (fs.Length <= fs.Position) { break; }
+
+
 #if UNITY_2017_3_OR_NEWER
-                        byte[] header = new byte[12];
-                        fs.Read(header, 0, header.Length);
-                        int size = GetIntValue(header, 4);
+                    byte[] header = new byte[12];
+                    fs.Read(header, 0, header.Length);
+                    int size = GetIntValue(header, 4);
 #else
                         byte[] header = new byte[16];
                         fs.Read(header, 0, header.Length);
                         int size = GetIntValue(header, 8);
 #endif
-                        writeFs.Write(header, 0, header.Length);
-                        byte[] buffer = new byte[size];
-                        fs.Read(buffer, 0, size);
-                        writeFs.Write(buffer, 0, buffer.Length);
-                        currentFilePos += size + header.Length;
-                        currentFrame++;
-                        flag = true;
+                    info.Size = size + header.Length;
+                    currentFilePos += info.Size;
+                    fs.Position = currentFilePos;
+                    this.progress = (float)((double)currentFilePos / (double)fileSize);
+                    this.blocks.Add(info);
+                }
+            }
+            this.isCompleteFlag = true;
+            this.progress = 1.0f;
+        }
+
+        public bool CreateTmpFile(int startFrame,int frameNum,string tempFile)
+        {
+            FileTransfer transferObj = new FileTransfer();
+            using (FileStream writeFs = File.OpenWrite(tempFile))
+            {
+                using (FileStream readFs = File.OpenRead(this.filePath))
+                {
+                    readFs.Position = this.blocks[startFrame].Position;
+
+                    for (int i = 0; i < frameNum; ++i) {
+                        transferObj.Transfer(readFs,
+                            writeFs,
+                            blocks[startFrame + i].Size);
                     }
                 }
             }
-            return flag;
+
+            return true;
         }
+
 
         private static int GetIntValue(byte[] bin, int offset)
         {

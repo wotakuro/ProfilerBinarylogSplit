@@ -13,8 +13,11 @@ namespace ProfilerBinlogSplit
 
     public interface ILogFileSlicer
     {
-        int GetCurrentFrame();
-        bool CreateTmpFile(int frameNum, string tmpFile);
+        bool IsPrepareDone { get; }
+        float PrepareProgress { get; }
+        int FrameNum { get; }
+        void SetFile(string file);
+        bool CreateTmpFile(int startFrame,int frameNum, string tmpFile);
     }
 
 }
