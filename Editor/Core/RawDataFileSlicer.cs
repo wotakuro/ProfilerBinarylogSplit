@@ -1,9 +1,10 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 
-namespace ProfilerBinlogSplit
+namespace UTJ.ProfilerLogSplit
 {
     public class RawDataFileSlicer : ILogFileSlicer
     {
@@ -38,7 +39,6 @@ namespace ProfilerBinlogSplit
         }
 
 
-        private List<FileBlockInfo> globalDatas;
         private List<FileBlockInfoWithThreadId> threadDatas;
 
         private List<FrameMessageInfo> frameMessages;
@@ -59,7 +59,6 @@ namespace ProfilerBinlogSplit
         public void SetFile(string path)
         {
             this.currentFilePath = path;
-            this.globalDatas = new List<FileBlockInfo>();
             this.threadDatas = new List<FileBlockInfoWithThreadId>();
             this.frameMessages = new List<FrameMessageInfo>();
 
@@ -79,36 +78,83 @@ namespace ProfilerBinlogSplit
             {
                 using (FileStream readFs = File.OpenRead(this.currentFilePath))
                 {
-                    var threadDataIdx = GetThreadDataIndexFromFrameIdx(frameIdx);
-                    this.GetHeadGlobalData( datas,this.threadDatas[threadDataIdx].blockInfo.Position);
+                    readFs.Seek(0, SeekOrigin.Begin);
+                    transferObj.Transfer(readFs, writeFs, 36);
 
-                    foreach (var data in datas)
-                    {
-                        readFs.Position = data.Position;
-                        transferObj.Transfer(readFs, writeFs, data.Size);
-                    }
+                    var startThreadIdx = GetThreadDataIndexFromFrameIdx(frameIdx);
+                    // write Global threaddata
+                    this.GlobalThreadData( datas,this.threadDatas[startThreadIdx].blockInfo.Position);
+                    this.TransferDatas(transferObj, datas, readFs, writeFs);
+                    /*
+                    UnityEngine.Debug.Log("Global Datgas " + datas.Count + "::" + datas[datas.Count-1].Position);
+                    */
+
+                    // write to body
+                    var endThreadIdx = GetThreadDataIndexFromFrameIdx(frameIdx+frameNum, startThreadIdx);
+                    long startFilePos = this.threadDatas[startThreadIdx].blockInfo.Position;
+                    long endFilePos = this.threadDatas[endThreadIdx].blockInfo.Position;
+                    readFs.Position = startFilePos;
+                    transferObj.Transfer(readFs, writeFs, endFilePos - startFilePos);
+                    /*
+                    UnityEngine.Debug.Log("Frame " + frameIdx + ";" + frameNum +
+                        "(" + startThreadIdx + "-" + endThreadIdx + 
+                        "(" + startFilePos + "-" +endFilePos);
+                        */
+                    // write thread data...
+                    datas.Clear();
+                    this.GetNextFrameOtherThreadDatas(datas,frameIdx+frameNum+1,endThreadIdx);
+                    this.TransferDatas(transferObj, datas, readFs, writeFs);
                 }
             }
 
             return true;
         }
 
-
-        private int GetHeadGlobalData(List<FileBlockInfo> datas,long pos)
+        private void TransferDatas(FileTransfer transferObj,List<FileBlockInfo> datas,FileStream readFs, FileStream writeFs)
         {
-            int idx = 0;
-            foreach( var data in globalDatas){
-                if( data.Position < pos)
+            foreach (var data in datas)
+            {
+                readFs.Position = data.Position;
+                transferObj.Transfer(readFs, writeFs, data.Size);
+            }
+
+        }
+
+
+        private void GetNextFrameOtherThreadDatas(List<FileBlockInfo> datas,int frame ,int endThreadIdx)
+        {
+            var nextIdx = GetThreadDataIndexFromFrameIdx(frame, endThreadIdx);
+
+            for(int i = endThreadIdx; i < nextIdx; ++i)
+            {
+                if( this.threadDatas[i].threadId != this.mainThreadId)
                 {
-                    datas.Add(data);
-                    ++idx;
+                    datas.Add(this.threadDatas[i].blockInfo);
+                }
+            }
+
+        }
+
+
+        private int GlobalThreadData(List<FileBlockInfo> datas,long pos,int startIdx = 0)
+        {
+            for(int i = startIdx; i < this.threadDatas.Count;++i)
+            {
+                var data = threadDatas[i];
+                if( data.threadId != BlockHeaderGlobalThreadId)
+                {
+                    continue;
+                }
+                if( data.blockInfo.Position < pos)
+                {
+                    datas.Add(data.blockInfo);
                 }
                 else
                 {
-                    break;
+                    return i;
                 }
             }
-            return idx;
+            return startIdx;
         }
 
 
@@ -147,8 +193,7 @@ namespace ProfilerBinlogSplit
                 this.version = GetUInt(fileHeader, 8);
                 this.mainThreadId = GetULongValue(fileHeader, 28);
                 this.isAlignedMemoryAccess = (fileHeader[5] != 0);
-                // add fileheader as global header
-                globalDatas.Add(new FileBlockInfo(0,36));
+
 
                 // read Blocks
                 this.ReadBlocks(fs);
@@ -163,11 +208,13 @@ namespace ProfilerBinlogSplit
         }
 
 
-        private int GetThreadDataIndexFromFrameIdx (int frameIdx)
+        private int GetThreadDataIndexFromFrameIdx (int frameIdx,int startIdx = 0)
         {
             uint actualFrame = this.startFrameIdx + (uint)frameIdx;
-            foreach (var message in frameMessages)
+
+            for( int i = startIdx; i < frameMessages.Count;++i)
             {
+                var message = frameMessages[i];
                 if(message.frameIdx == actualFrame)
                 {
                     return message.dataPosIndex;
@@ -198,10 +245,11 @@ namespace ProfilerBinlogSplit
         {
             while (true)
             {
-                if( this.currentFileLength <= fs.Position) { 
+                if (this.currentFileLength <= fs.Position)
+                {
                     break;
                 }
-                this.progress =(float) ( (double)fs.Position / (double) this.currentFileLength );
+                this.progress = (float)((double)fs.Position / (double)this.currentFileLength);
 
                 long position = fs.Position;
                 byte[] blockHeader = ReadFromFile(fs, 20);
@@ -212,7 +260,7 @@ namespace ProfilerBinlogSplit
                 uint frameIdx;
                 bool isMessage = ReadFrameMessage(messageInfo, out frameIdx);
 
-                if(isMessage)
+                if (isMessage)
                 {
                     var frameMsgInfo = new FrameMessageInfo()
                     {
@@ -225,19 +273,12 @@ namespace ProfilerBinlogSplit
 
                 /* header + size + footer */
                 var blockInfo = new FileBlockInfo(position, 20 + length + 8);
-                if (threadId == BlockHeaderGlobalThreadId)
+                FileBlockInfoWithThreadId info = new FileBlockInfoWithThreadId()
                 {
-                    this.globalDatas.Add(blockInfo);
-                }
-                else
-                {
-                    FileBlockInfoWithThreadId info = new FileBlockInfoWithThreadId()
-                    {
-                        blockInfo = blockInfo,
-                        threadId = threadId
-                    };
-                    this.threadDatas.Add(info);
-                }
+                    blockInfo = blockInfo,
+                    threadId = threadId
+                };
+                this.threadDatas.Add(info);
                 fs.Position = blockInfo.Position + blockInfo.Size;
             }
         }

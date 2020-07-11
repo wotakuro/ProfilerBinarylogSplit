@@ -8,7 +8,7 @@ using UnityEngine.Profiling;
 #endif
 
 
-namespace ProfilerBinlogSplit
+namespace UTJ.ProfilerLogSplit
 {
 
     public interface ILogFileSlicer

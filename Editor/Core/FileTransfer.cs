@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using UnityEditor.PackageManager.Requests;
 
-namespace ProfilerBinlogSplit
+namespace UTJ.ProfilerLogSplit
 {
     public class FileTransfer
     {

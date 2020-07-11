@@ -4,7 +4,7 @@ using System.IO;
 using UnityEngine;
 using System.Threading;
 
-namespace ProfilerBinlogSplit
+namespace UTJ.ProfilerLogSplit
 {
     internal struct FileBlockInfo
     {

@@ -11,7 +11,7 @@ using UnityEngine.Experimental.UIElements;
 using UnityEditor.Experimental.UIElements;
 #endif
 
-namespace ProfilerBinlogSplit
+namespace UTJ.ProfilerLogSplit
 {
     public class PrepareProgressUI:VisualElement
     {

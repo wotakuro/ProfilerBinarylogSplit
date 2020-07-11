@@ -5,10 +5,13 @@
         <ui:Button text="File" name="SelFileBtn" style="width: 60px;" />
     </ui:VisualElement>
     <ui:VisualElement name="AfterAnalyze" style="margin-top: 10px; margin-left: 20px; margin-right: 10px;">
-        <ui:Label text="Label" />
+        <ui:Label text="Label" name="Result" />
         <ui:MinMaxSlider picking-mode="Ignore" label="ProfilerFrame" min-value="10" max-value="12" low-limit="-10" high-limit="40" name="ProfilerFrame" style="padding-left: 5px;" />
         <uie:IntegerField picking-mode="Ignore" label="MinFrame" value="0" name="ProfilerMinFrame" style="padding-left: 5px;" />
         <uie:IntegerField picking-mode="Ignore" label="MaxFrame" value="1" name="ProfilerMaxFrame" style="padding-left: 5px;" />
-        <ui:Button text="SendToProfiler" name="SendProfilerBtn" style="width: 160px;" />
+        <ui:VisualElement style="flex-direction: row;">
+            <ui:Button text="SendToProfiler" name="SendProfilerBtn" style="width: 160px;" />
+            <ui:Button text="Next Block" name="NextBlockBtn" style="width: 100px; margin-left: 40px;" />
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>
