@@ -58,17 +58,16 @@ UnityのProfilerが300件までしか履歴がないらしく、それ以上の�
 ### 利用方法
 Assets/ProfilerBinlogSplit 以下をプロジェクトにコピーして下さい。  
 MenuよりTools->UTJ->ProfilerBinlogSplitで、このツールを呼び出してください。ウィンドウが出てくるはずです。  
-![Alt text](/Documentation~/img/Before.png)
+![Alt text](/Documentation~/img/ProfilerSplit.png)
 
-開いたら「File」ボタンでバイナリログファイルの指定をしてください。<br />
-ファイルが指定されると、中を見てフレーム数などを解析します。<br />
+1).バイナリログファイルの指定をしてください  
+2).読み込むフレーム数を指定できます  
+3).②で指定したフレーム数のデータをProfilerに渡します  
+4).ここのフレームから読み込み始めます  
+5).0フレーム目から再スタートさせます  
 
-![Alt text](/Documentation~/img/After.png)
-<br />
-ファイルの解析が完了するとこのような画面になります。<br />
-1.Profilerに送るフレームの範囲を指定します<br />
-2.Profilerに指定したフレームを送ります<br />
-3.次のブロックへ進みます<br />
+このように実行されます  
+![Alt text](/Documentation~/img/Execute.png)
 
 ## Sampleについて
 Assets/Sample以下にログ書き出しのサンプルを用意しました。
