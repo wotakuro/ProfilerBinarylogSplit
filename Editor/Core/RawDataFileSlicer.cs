@@ -103,7 +103,7 @@ namespace UTJ.ProfilerLogSplit
             int endThreadIdx = GetThreadDataIndexFromFrameIdx(frameIdx + frameNum);
             int nextThreadIdx = GetThreadDataIndexFromFrameIdx(frameIdx + frameNum + 1);
 
-            var dictData = CalcFrameInfoStartIndexDictionary(startThreadIdx, frameIdx);
+            var dictData = CalcFrameInfoStartIndexDictionary(frameIdx);
 
             for(int i = startThreadIdx; i < endThreadIdx; ++i)
             {
@@ -113,7 +113,7 @@ namespace UTJ.ProfilerLogSplit
                 shouldAdd |= (threadId == BlockHeaderGlobalThreadId);
                 shouldAdd |= (threadId == this.mainThreadId);
                 int idx;
-                if(dictData.TryGetValue(threadId,out idx))
+                if(!shouldAdd && dictData.TryGetValue(threadId,out idx))
                 {
                     shouldAdd = (i >= idx);
                 }
@@ -244,11 +244,11 @@ namespace UTJ.ProfilerLogSplit
             this.progress = 1.0f;
         }
 
-        private Dictionary<ulong,int> CalcFrameInfoStartIndexDictionary(int startIdx,int frameIdx)
+        private Dictionary<ulong,int> CalcFrameInfoStartIndexDictionary(int frameIdx)
         {
             Dictionary<ulong, int> retVal = new Dictionary<ulong, int>();
 
-            for (int i = startIdx; i < frameMessages.Count; ++i)
+            for (int i = 0; i < frameMessages.Count; ++i)
             {
                 var message = frameMessages[i];
                 if(retVal.ContainsKey(message.threadId)) { continue; }
