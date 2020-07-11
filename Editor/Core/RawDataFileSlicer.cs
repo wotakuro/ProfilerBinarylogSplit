@@ -29,7 +29,7 @@ namespace UTJ.ProfilerLogSplit
         internal struct FrameMessageInfo
         {
             public ulong threadId;
-            public uint frameIdx;
+            public uint profileFrameIdx;
             public int dataPosIndex;
         }
         internal struct FileBlockInfoWithThreadId
@@ -74,7 +74,7 @@ namespace UTJ.ProfilerLogSplit
         {
             FileTransfer transferObj = new FileTransfer();
             List<FileBlockInfo> datas = new List<FileBlockInfo>();
-            using (FileStream writeFs = File.OpenWrite(tmpFile))
+            using (FileStream writeFs = File.Open(tmpFile, FileMode.Create))
             {
                 using (FileStream readFs = File.OpenRead(this.currentFilePath))
                 {
@@ -85,29 +85,55 @@ namespace UTJ.ProfilerLogSplit
                     // write Global threaddata
                     this.GlobalThreadData( datas,this.threadDatas[startThreadIdx].blockInfo.Position);
                     this.TransferDatas(transferObj, datas, readFs, writeFs);
-                    /*
-                    UnityEngine.Debug.Log("Global Datgas " + datas.Count + "::" + datas[datas.Count-1].Position);
-                    */
 
                     // write to body
-                    var endThreadIdx = GetThreadDataIndexFromFrameIdx(frameIdx+frameNum, startThreadIdx);
-                    long startFilePos = this.threadDatas[startThreadIdx].blockInfo.Position;
-                    long endFilePos = this.threadDatas[endThreadIdx].blockInfo.Position;
-                    readFs.Position = startFilePos;
-                    transferObj.Transfer(readFs, writeFs, endFilePos - startFilePos);
-                    /*
-                    UnityEngine.Debug.Log("Frame " + frameIdx + ";" + frameNum +
-                        "(" + startThreadIdx + "-" + endThreadIdx + 
-                        "(" + startFilePos + "-" +endFilePos);
-                        */
+                    datas.Clear();
+                    this.GetBodyBlocks(datas, frameIdx, frameNum, startThreadIdx);
+
+                    this.TransferDatas(transferObj, datas, readFs, writeFs);
                     // write thread data...
                     datas.Clear();
-                    this.GetNextFrameOtherThreadDatas(datas,frameIdx+frameNum+1,endThreadIdx);
-                    this.TransferDatas(transferObj, datas, readFs, writeFs);
                 }
             }
-
             return true;
+        }
+
+        private void GetBodyBlocks(List<FileBlockInfo> datas,int frameIdx,int frameNum,int startThreadIdx)
+        {
+            int endThreadIdx = GetThreadDataIndexFromFrameIdx(frameIdx + frameNum);
+            int nextThreadIdx = GetThreadDataIndexFromFrameIdx(frameIdx + frameNum + 1);
+
+            var dictData = CalcFrameInfoStartIndexDictionary(startThreadIdx, frameIdx);
+
+            for(int i = startThreadIdx; i < endThreadIdx; ++i)
+            {
+                var blockInfo = this.threadDatas[i].blockInfo;
+                var threadId = threadDatas[i].threadId;
+                bool shouldAdd = false;
+                shouldAdd |= (threadId == BlockHeaderGlobalThreadId);
+                shouldAdd |= (threadId == this.mainThreadId);
+                int idx;
+                if(dictData.TryGetValue(threadId,out idx))
+                {
+                    shouldAdd = (i >= idx);
+                }
+
+                if (shouldAdd)
+                {
+                    datas.Add(blockInfo);
+                }
+            }
+            // add next frame
+            for(int i = endThreadIdx + 1; i < nextThreadIdx; ++i)
+            {
+                if( this.mainThreadId == this.threadDatas[i].threadId)
+                {
+                    continue;
+                }
+                var blockInfo = this.threadDatas[i].blockInfo;
+                datas.Add(blockInfo);
+            }
+
         }
 
         private void TransferDatas(FileTransfer transferObj,List<FileBlockInfo> datas,FileStream readFs, FileStream writeFs)
@@ -120,20 +146,6 @@ namespace UTJ.ProfilerLogSplit
 
         }
 
-
-        private void GetNextFrameOtherThreadDatas(List<FileBlockInfo> datas,int frame ,int endThreadIdx)
-        {
-            var nextIdx = GetThreadDataIndexFromFrameIdx(frame, endThreadIdx);
-
-            for(int i = endThreadIdx; i < nextIdx; ++i)
-            {
-                if( this.threadDatas[i].threadId != this.mainThreadId)
-                {
-                    datas.Add(this.threadDatas[i].blockInfo);
-                }
-            }
-
-        }
 
 
         private int GlobalThreadData(List<FileBlockInfo> datas,long pos,int startIdx = 0)
@@ -202,20 +214,61 @@ namespace UTJ.ProfilerLogSplit
             // フレーム数算出
             this.frameNum = CalculateFrameNum(out startFrameIdx);
 
+            {
+                System.Text.StringBuilder sb = new System.Text.StringBuilder(2048*1024);
+                // DEBUG
+                sb.Append("mainThread:").Append(this.mainThreadId).Append("\n");
+                foreach (var msg in frameMessages)
+                {
+                    sb.Append("thread:").Append(msg.threadId);
+                    sb.Append(" frame:").Append(msg.profileFrameIdx);
+                    sb.Append(" index:").Append(msg.dataPosIndex);
+                    sb.Append(" FilePos:").Append(this.threadDatas[(int)msg.dataPosIndex].blockInfo.Position);
+                    sb.Append(" Length:").Append(this.threadDatas[(int)msg.dataPosIndex].blockInfo.Size);
+                    sb.Append(" Thread:").Append( this.threadDatas[(int)msg.dataPosIndex].threadId ).Append("\n");
+                }
+                File.WriteAllText("frameMessages.txt", sb.ToString() );
+                sb.Clear();
+                sb.Append("mainThread:").Append(this.mainThreadId).Append("\n");
+
+                foreach( var data in this.threadDatas)
+                {
+                    sb.Append("thread:").Append(data.threadId);
+                    sb.Append(" pos:") .Append( data.blockInfo.Position).Append( " size:").Append(data.blockInfo.Size).Append("\n");
+                }
+                File.WriteAllText("threadDatas.txt", sb.ToString());
+            }
+
             // 終了
             this.isComplete = true;
             this.progress = 1.0f;
         }
 
+        private Dictionary<ulong,int> CalcFrameInfoStartIndexDictionary(int startIdx,int frameIdx)
+        {
+            Dictionary<ulong, int> retVal = new Dictionary<ulong, int>();
 
-        private int GetThreadDataIndexFromFrameIdx (int frameIdx,int startIdx = 0)
+            for (int i = startIdx; i < frameMessages.Count; ++i)
+            {
+                var message = frameMessages[i];
+                if(retVal.ContainsKey(message.threadId)) { continue; }
+                if( message.profileFrameIdx >= frameIdx + this.startFrameIdx)
+                {
+                    retVal.Add(message.threadId, i);
+                }
+            }
+
+            return retVal;
+        }
+
+        private int GetThreadDataIndexFromFrameIdx (int frameIdx)
         {
             uint actualFrame = this.startFrameIdx + (uint)frameIdx;
 
-            for( int i = startIdx; i < frameMessages.Count;++i)
+            for( int i = 0; i < frameMessages.Count;++i)
             {
                 var message = frameMessages[i];
-                if(message.frameIdx == actualFrame)
+                if(message.profileFrameIdx == actualFrame)
                 {
                     return message.dataPosIndex;
                 }
@@ -229,13 +282,13 @@ namespace UTJ.ProfilerLogSplit
             uint maxFrameidx = uint.MinValue;
             foreach(var message in frameMessages)
             {
-                if (message.frameIdx < minFrameIdx)
+                if (message.profileFrameIdx < minFrameIdx)
                 {
-                    minFrameIdx = message.frameIdx;
+                    minFrameIdx = message.profileFrameIdx;
                 }
-                if (message.frameIdx > maxFrameidx)
+                if (message.profileFrameIdx > maxFrameidx)
                 {
-                    maxFrameidx = message.frameIdx;
+                    maxFrameidx = message.profileFrameIdx;
                 }
             }
             return (int)(maxFrameidx - minFrameIdx) + 1;
@@ -265,7 +318,7 @@ namespace UTJ.ProfilerLogSplit
                     var frameMsgInfo = new FrameMessageInfo()
                     {
                         threadId = threadId,
-                        frameIdx = frameIdx,
+                        profileFrameIdx = frameIdx,
                         dataPosIndex = this.threadDatas.Count
                     };
                     frameMessages.Add(frameMsgInfo);

@@ -14,7 +14,7 @@ namespace UTJ.ProfilerLogSplit
 {
     public class BinLogToUnityProfiler : EditorWindow
     {
-        private const string TmpFileName = "Temp/tmpProfiler.data";
+        private const string TmpFileName = "tmpProfiler.log";
 
         private PrepareProgressUI progressUI;
         private VisualElement afterPrepareElement;
