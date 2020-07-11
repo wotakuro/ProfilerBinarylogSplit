@@ -214,31 +214,6 @@ namespace UTJ.ProfilerLogSplit
             // フレーム数算出
             this.frameNum = CalculateFrameNum(out startFrameIdx);
 
-            {
-                System.Text.StringBuilder sb = new System.Text.StringBuilder(2048*1024);
-                // DEBUG
-                sb.Append("mainThread:").Append(this.mainThreadId).Append("\n");
-                foreach (var msg in frameMessages)
-                {
-                    sb.Append("thread:").Append(msg.threadId);
-                    sb.Append(" frame:").Append(msg.profileFrameIdx);
-                    sb.Append(" index:").Append(msg.dataPosIndex);
-                    sb.Append(" FilePos:").Append(this.threadDatas[(int)msg.dataPosIndex].blockInfo.Position);
-                    sb.Append(" Length:").Append(this.threadDatas[(int)msg.dataPosIndex].blockInfo.Size);
-                    sb.Append(" Thread:").Append( this.threadDatas[(int)msg.dataPosIndex].threadId ).Append("\n");
-                }
-                File.WriteAllText("frameMessages.txt", sb.ToString() );
-                sb.Clear();
-                sb.Append("mainThread:").Append(this.mainThreadId).Append("\n");
-
-                foreach( var data in this.threadDatas)
-                {
-                    sb.Append("thread:").Append(data.threadId);
-                    sb.Append(" pos:") .Append( data.blockInfo.Position).Append( " size:").Append(data.blockInfo.Size).Append("\n");
-                }
-                File.WriteAllText("threadDatas.txt", sb.ToString());
-            }
-
             // 終了
             this.isComplete = true;
             this.progress = 1.0f;
