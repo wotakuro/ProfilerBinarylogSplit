@@ -69,9 +69,3 @@ MenuよりTools->UTJ->ProfilerBinlogSplitで、このツールを呼び出して
 1.Profilerに送るフレームの範囲を指定します<br />
 2.Profilerに指定したフレームを送ります<br />
 3.次のブロックへ進みます<br />
-
-## Sampleについて
-Assets/Sample以下にログ書き出しのサンプルを用意しました。
-
-また、サンプル用に事前に書き出したログ「profiler_sample.log.data」を直下に置いています。
-※5.4にて作成したログなので、5.4でお試しください。
