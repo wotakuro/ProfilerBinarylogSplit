@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using Palmmedia.ReportGenerator.Core.Common;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -13,9 +14,13 @@ namespace UTJ.ProfilerLogSplit
         const ulong BlockHeaderGlobalThreadId = 18446744073709551614;
         const ushort MessageFrame = 34;
 
+        const uint HeaderV2 = 0x20211028;
+
         private bool isAlignedMemoryAccess;
         private ulong mainThreadId;
         private uint version;
+        private uint[] unityVersion;
+
         private string currentFilePath;
         private long currentFileLength;
 
@@ -79,7 +84,15 @@ namespace UTJ.ProfilerLogSplit
                 using (FileStream readFs = File.OpenRead(this.currentFilePath))
                 {
                     readFs.Seek(0, SeekOrigin.Begin);
-                    transferObj.Transfer(readFs, writeFs, 36);
+                    if (this.unityVersion == null)
+                    {
+                        transferObj.Transfer(readFs, writeFs, 36);
+                    }
+                    else
+                    {
+                        transferObj.Transfer(readFs, writeFs, 56);
+                    }
+
 
                     var startThreadIdx = GetThreadDataIndexFromFrameIdx(frameIdx);
                     // write Global threaddata
@@ -205,7 +218,19 @@ namespace UTJ.ProfilerLogSplit
                 this.version = GetUInt(fileHeader, 8);
                 this.mainThreadId = GetULongValue(fileHeader, 28);
                 this.isAlignedMemoryAccess = (fileHeader[5] != 0);
-
+                if(this.version >= HeaderV2)
+                {
+                    byte[] unityVersionData = ReadFromFile(fs, 20);
+                    this.unityVersion = new uint[5];
+                    for (int i = 0; i < 5; ++i)
+                    {
+                        this.unityVersion[i] = GetUInt(unityVersionData,4 * i);
+                    }
+                }
+                else
+                {
+                    this.unityVersion = null;
+                }
 
                 // read Blocks
                 this.ReadBlocks(fs);
